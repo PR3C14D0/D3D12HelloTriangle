@@ -47,7 +47,46 @@ Core::Core(HWND& hwnd) {
 	}
 	/* End:Creation of our swap chain */
 
+	ThrowIfFailed(this->dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(this->allocator.GetAddressOf()))); // We create our command allocator
 
+	InitBuffer();
+
+}
+
+/*
+	In this method we are going to initialize our vertex buffer.
+	On this vertex buffer we are only going to enter 3 vertices.
+	These vertices are going to be a triangle vertices.
+*/
+void Core::InitBuffer() {
+	/* 
+		These vertices need to go clockwise because we're gonna enable Backface culling on our rasterizer. 
+		Read more about rasterizer state at https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_rasterizer_desc  
+	*/
+	vertex vertices[] = {
+		{0.f, .5f, 0.f, { 1.f, 0.f, 0.f, 1.f }},
+		{-.5f, -.5f, 0.f, { 1.f, 0.f, 0.f, 1.f }},
+		{.5f, -.5f, 0.f, { 1.f, 0.f, 0.f, 1.f }},
+	};
+
+	UINT verticesSize = sizeof(vertices); // Size of our vertex array
+
+	/* Creation of our vertex buffer */
+	ThrowIfFailed(this->dev->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(verticesSize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(this->vertexBuffer.GetAddressOf())
+	));
+
+	this->vertexBufferView.BufferLocation = this->vertexBuffer->GetGPUVirtualAddress();
+	this->vertexBufferView.SizeInBytes = verticesSize;
+	this->vertexBufferView.StrideInBytes = sizeof(vertex);
+	/* End:Creation of our vertex buffer */
+
+	return;
 }
 
 /*
