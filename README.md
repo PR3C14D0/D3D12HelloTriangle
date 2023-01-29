@@ -5,3 +5,6 @@
 - D3D12 Initialization
 - Simple triangle vertex buffer creation
 - Sync between GPU & CPU
+# Credits
+- In this project im using [DirectX 12](https://devblogs.microsoft.com/directx/landing-page/)
+- I use [DirectX-Headers](https://github.com/microsoft/DirectX-Headers) repository for D3D12 headers
