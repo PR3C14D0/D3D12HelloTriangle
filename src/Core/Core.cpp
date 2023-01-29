@@ -31,6 +31,22 @@ Core::Core(HWND& hwnd) {
 	ThrowIfFailed(this->dev->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(this->queue.GetAddressOf())));
 	/* End:Creation of our command queue */
 
+	/* Creation of our swap chain */
+	{
+		ComPtr<IDXGISwapChain1> sc;
+
+		DXGI_SWAP_CHAIN_DESC1 scDesc = { };
+		scDesc.BufferCount = 2;
+		scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		scDesc.SampleDesc.Count = 1;
+		scDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		scDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	
+		ThrowIfFailed(this->factory->CreateSwapChainForHwnd(this->queue.Get(), this->hwnd, &scDesc, nullptr, nullptr, sc.GetAddressOf()));
+		sc.As(&this->sc);
+	}
+	/* End:Creation of our swap chain */
+
 
 }
 
