@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include "Core/Core.h"
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -33,6 +34,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	ShowWindow(g_hwnd, nShowCmd);
+
+	Core* core = new Core(g_hwnd);
 
 	MSG msg = { };
 	while (!g_quit) {
