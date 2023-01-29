@@ -43,6 +43,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
+		core->MainLoop();
 	}
 
 	return 0;

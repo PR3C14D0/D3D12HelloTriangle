@@ -45,15 +45,23 @@ private:
 	ComPtr<ID3D12RootSignature> rootSig;
 
 	ComPtr<ID3D12Fence> fence;
+	HANDLE fenceEvent;
 
 	ComPtr<ID3D12Resource> vertexBuffer;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
 
 	std::vector<ComPtr<ID3D12Resource>> backBuffers;
 
+	D3D12_RECT scissorRect;
+
+	int width, height;
+
+	D3D12_VIEWPORT viewport;
+
 	UINT backBufferOffset;
 
 	int nNumBackBuffers;
+	int nCurrentBackBuffer;
 	
 	void GetMostCapableAdapter(ComPtr<IDXGIAdapter>& adapter, ComPtr<IDXGIFactory2>& factory);
 
@@ -61,6 +69,12 @@ private:
 
 	void InitBuffer();
 	void InitPipeline();
+
+	void PopulateCommandList();
+
+	int nCurrentFence;
+	void WaitFrame();
 public:
 	Core(HWND& hwnd);
+	void MainLoop();
 };

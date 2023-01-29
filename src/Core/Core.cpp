@@ -81,6 +81,46 @@ Core::Core(HWND& hwnd) {
 	ThrowIfFailed(this->dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, this->allocator.Get(), this->plState.Get(), IID_PPV_ARGS(this->list.GetAddressOf())));
 	ThrowIfFailed(this->list->Close());
 
+	/* Get our window height and width */
+	RECT rect;
+	GetWindowRect(this->hwnd, &rect);
+	this->width = rect.right - rect.left;
+	this->height = rect.bottom - rect.top;
+	/* End:Get our window height and width */
+
+	/* Creation of our Scissor rect */
+	this->scissorRect = CD3DX12_RECT(0, 0, (LONG)this->width, (LONG)this->height);
+	/* End:Creation of our Scissor rect */
+
+	/* Creation of our viewport */
+	this->viewport.TopLeftX = 0;
+	this->viewport.TopLeftY = 0;
+	this->viewport.Width = this->width;
+	this->viewport.Height = this->height;
+	/* End:Creation of our viewport */
+
+	this->nCurrentFence = 1;
+	this->dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(this->fence.GetAddressOf()));
+
+	this->fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+	this->WaitFrame();
+}
+
+/*
+	For GPU and CPU sync, we'll wait for the previous frame to end up.
+*/
+void Core::WaitFrame() {
+	int nFence = this->nCurrentFence;
+	ThrowIfFailed(this->queue->Signal(this->fence.Get(), nFence));
+	this->nCurrentFence++;
+
+	if (this->fence->GetCompletedValue() < nFence) {
+		ThrowIfFailed(this->fence->SetEventOnCompletion(nFence, this->fenceEvent));
+		WaitForSingleObject(this->fenceEvent, INFINITE);
+	}
+
+	this->nCurrentBackBuffer = this->sc->GetCurrentBackBufferIndex();
 }
 
 /*
@@ -95,8 +135,8 @@ void Core::InitBuffer() {
 	*/
 	vertex vertices[] = {
 		{0.f, .5f, 0.f, { 1.f, 0.f, 0.f, 1.f }},
-		{-.5f, -.5f, 0.f, { 1.f, 0.f, 0.f, 1.f }},
-		{.5f, -.5f, 0.f, { 1.f, 0.f, 0.f, 1.f }},
+		{.5f, -.5f, 0.f, { 0.f, 0.f, 1.f, 1.f }},
+		{-.5f, -.5f, 0.f, { 0.f, 1.f, 0.f, 1.f }},
 	};
 
 	UINT verticesSize = sizeof(vertices); // Size of our vertex array
@@ -114,6 +154,12 @@ void Core::InitBuffer() {
 		IID_PPV_ARGS(this->vertexBuffer.GetAddressOf())
 	));
 
+	PUINT mappedBuff;
+	CD3DX12_RANGE writeRange(0, 0);
+	this->vertexBuffer->Map(0, &writeRange, (void**)&mappedBuff);
+	memcpy(mappedBuff, vertices, verticesSize);
+	this->vertexBuffer->Unmap(0, nullptr);
+	
 	this->vertexBufferView.BufferLocation = this->vertexBuffer->GetGPUVirtualAddress();
 	this->vertexBufferView.SizeInBytes = verticesSize;
 	this->vertexBufferView.StrideInBytes = sizeof(vertex);
@@ -224,6 +270,52 @@ void Core::InitPipeline() {
 
 	ThrowIfFailed(this->dev->CreateGraphicsPipelineState(&plDesc, IID_PPV_ARGS(this->plState.GetAddressOf())));
 	/* End:Creation of our pipeline state*/
+}
+
+/*
+	In this method, we will configure our command list.
+*/
+void Core::PopulateCommandList() {
+	ThrowIfFailed(this->allocator->Reset());
+	ThrowIfFailed(this->list->Reset(this->allocator.Get(), this->plState.Get()));
+
+	this->list->RSSetScissorRects(1, &this->scissorRect);
+	this->list->RSSetViewports(1, &this->viewport);
+
+	D3D12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(this->backBuffers[this->nCurrentBackBuffer].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	this->list->ResourceBarrier(1, &resourceBarrier);
+
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE backBufferHandle(this->backBufferDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), this->nCurrentBackBuffer, this->backBufferOffset);
+	this->list->OMSetRenderTargets(1, &backBufferHandle, FALSE, nullptr);
+	this->list->ClearRenderTargetView(backBufferHandle, RGBA{ 0.f, 0.f, 0.f, 1.f }, 0, nullptr);
+	this->list->IASetVertexBuffers(0, 1, &this->vertexBufferView);
+	this->list->SetGraphicsRootSignature(this->rootSig.Get());
+	this->list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	this->list->DrawInstanced(3, 1, 0, 0);
+
+	resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(this->backBuffers[this->nCurrentBackBuffer].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	this->list->ResourceBarrier(1, &resourceBarrier);
+
+	this->list->Close();
+
+	return;
+}
+
+/* 
+	Our render loop. This method will be called every frame.
+		E.g: If 60 FPS, this method will be called 60 times per second
+*/
+void Core::MainLoop() {
+	this->PopulateCommandList();
+
+	ID3D12CommandList* commandLists = { this->list.Get() };
+	this->queue->ExecuteCommandLists(1, &commandLists);
+
+	this->sc->Present(1, 0);
+
+	this->WaitFrame();
 }
 
 /*
